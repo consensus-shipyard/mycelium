@@ -1,9 +1,9 @@
 module github.com/filecoin-project/faucet
 
-go 1.18
+go 1.19
 
 require (
-	github.com/ardanlabs/conf/v3 v3.1.2
+	github.com/ardanlabs/conf/v3 v3.1.7
 	github.com/filecoin-project/go-address v1.1.0
 	github.com/filecoin-project/go-state-types v0.10.0
 	github.com/filecoin-project/lotus v1.20.1

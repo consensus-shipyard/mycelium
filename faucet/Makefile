@@ -1,4 +1,4 @@
-all: tidy format lint test
+all: tidy fmt lint test
 
 .PHONY: tidy
 tidy:
@@ -9,7 +9,7 @@ test:
 	go test -v -shuffle=on -count=1 -race -timeout 20m ./...
 
 .PHONY: format
-format:
+fmt:
 	gofmt -w -s .
 	goimports -w -local "github.com/filecoin-project/" .
 
@@ -19,7 +19,7 @@ lint:
 
 .PHONY: vulncheck
 vulncheck:
-	govulncheck -v ./...
+	govulncheck ./...
 
 .PHONY: cert
 cert:

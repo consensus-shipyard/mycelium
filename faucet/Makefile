@@ -4,14 +4,14 @@ all: tidy fmt lint test
 tidy:
 	go mod tidy
 
-.PHONY: test
-test:
+.PHONY: go-test
+go-test:
 	go test -v -shuffle=on -count=1 -race -timeout 20m ./...
 
-.PHONY: format
+.PHONY: fmt
 fmt:
 	gofmt -w -s .
-	goimports -w -local "github.com/filecoin-project/" .
+	goimports -w -local "github.com/consensus-shipyard/" .
 
 .PHONY: lint
 lint:
@@ -35,6 +35,15 @@ demo-tls:
 	rm -rf ./_db_data
 	go run ./cmd/main.go --web-allowed-origins "https://localhost" --web-backend-host "https://localhost:443/fund" --filecoin-address "f1cp4q4lqsdhob23ysywffg2tvbmar5cshia4rweq" --tls-cert-file "./_cert/cert.pem" --tls-key-file "./_cert/key.pem"
 
-.PHONY: health
-health:
-	go run ./cmd/health/main.go --web-host "127.0.0.1:9000"
+.PHONY: node-start
+node-start:
+	docker run --name ganache-node --rm --detach --publish 8545:8545 trufflesuite/ganache:latest \
+ 		--accounts 10 --wallet.deterministic
+
+.PHONY: node-stop
+node-stop:
+	docker stop ganache-node
+
+
+.PHONY: test
+test: node-start go-test node-stop

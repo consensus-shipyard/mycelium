@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf/v3"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/handlers"
 	datastore "github.com/ipfs/go-ds-leveldb"
 	logging "github.com/ipfs/go-log/v2"
@@ -19,11 +20,9 @@ import (
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 	"go.uber.org/zap"
 
-	"github.com/filecoin-project/faucet/internal/faucet"
-	app "github.com/filecoin-project/faucet/internal/http"
-	"github.com/filecoin-project/faucet/internal/platform/lotus"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/lotus/api/client"
+	"github.com/consensus-shipyard/calibration/faucet/internal/data"
+	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
+	app "github.com/consensus-shipyard/calibration/faucet/internal/http"
 )
 
 var build = "develop"
@@ -62,16 +61,16 @@ func run(log *logging.ZapEventLogger) error {
 			CertFile string `conf:"default:nocert.pem"`
 			KeyFile  string `conf:"default:nokey.pem"`
 		}
-		Filecoin struct {
-			Address string `conf:"default:t1jlm55oqkdalh2l3akqfsaqmpjxgjd36pob34dqy"`
+		Faucet struct {
 			// Amount of tokens that below is in FIL.
 			TotalWithdrawalLimit   uint64 `conf:"default:10000"`
 			AddressWithdrawalLimit uint64 `conf:"default:20"`
 			WithdrawalAmount       uint64 `conf:"default:10"`
 		}
-		Lotus struct {
-			APIHost   string `conf:"default:127.0.0.1:1230"`
-			AuthToken string
+		Ethereum struct {
+			APIHost    string `conf:"default:https://mainnet.infura.io"`
+			APIToken   string
+			PrivateKey string
 		}
 		DB struct {
 			Path     string `conf:"default:./_db_data"`
@@ -134,46 +133,21 @@ func run(log *logging.ZapEventLogger) error {
 	}()
 
 	// =========================================================================
-	// Initialize authentication support
+	// Start Ethereum client
 
-	log.Infow("startup", "status", "initializing authentication support")
-
-	var authToken string
-
-	if cfg.Lotus.AuthToken == "" {
-		authToken, err = lotus.GetToken()
-		if err != nil {
-			return fmt.Errorf("error getting authentication token: %w", err)
-		}
-	} else {
-		authToken = cfg.Lotus.AuthToken
-	}
-	header := http.Header{"Authorization": []string{"Bearer " + authToken}}
-
-	// =========================================================================
-	// Start Lotus client
-
-	faucetAddr, err := address.NewFromString(cfg.Filecoin.Address)
+	client, err := ethclient.Dial(cfg.Ethereum.APIHost)
 	if err != nil {
-		return fmt.Errorf("failed to parse Faucet address: %w", err)
+		return fmt.Errorf("failed to connect to API: %w", err)
 	}
 
-	log.Infow("startup", "status", "initializing Lotus support", "host", cfg.Lotus.APIHost)
-
-	lotusNode, lotusCloser, err := client.NewFullNodeRPCV1(ctx, "ws://"+cfg.Lotus.APIHost+"/rpc/v1", header)
+	account, err := data.NewAccount(cfg.Ethereum.PrivateKey)
 	if err != nil {
-		return fmt.Errorf("connecting to Lotus failed: %w", err)
+		return fmt.Errorf("failed to initialize account: %w", err)
 	}
-	defer func() {
-		log.Infow("shutdown", "status", "stopping Lotus client support")
-		lotusCloser()
-	}()
 
-	log.Infow("Successfully connected to Lotus node")
-
-	// sanity-check to see if the node owns the key.
-	if err := lotus.VerifyWallet(ctx, lotusNode, faucetAddr); err != nil {
-		return fmt.Errorf("faucet wallet sanity-check failed: %w", err)
+	chainID, err := client.NetworkID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize private key: %w", err)
 	}
 
 	// =========================================================================
@@ -199,13 +173,14 @@ func run(log *logging.ZapEventLogger) error {
 	api := http.Server{
 		TLSConfig: tlsConfig,
 		Addr:      cfg.Web.Host,
-		Handler: handlers.RecoveryHandler()(app.FaucetHandler(log, lotusNode, db, &faucet.Config{
-			FaucetAddress:          faucetAddr,
+		Handler: handlers.RecoveryHandler()(app.FaucetHandler(log, client, db, build, &faucet.Config{
 			AllowedOrigins:         cfg.Web.AllowedOrigins,
 			BackendAddress:         cfg.Web.BackendHost,
-			TotalWithdrawalLimit:   cfg.Filecoin.TotalWithdrawalLimit,
-			AddressWithdrawalLimit: cfg.Filecoin.AddressWithdrawalLimit,
-			WithdrawalAmount:       cfg.Filecoin.WithdrawalAmount,
+			TotalWithdrawalLimit:   cfg.Faucet.TotalWithdrawalLimit,
+			AddressWithdrawalLimit: cfg.Faucet.AddressWithdrawalLimit,
+			WithdrawalAmount:       cfg.Faucet.WithdrawalAmount,
+			Account:                account,
+			ChainID:                chainID,
 		})),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
@@ -240,7 +215,9 @@ func run(log *logging.ZapEventLogger) error {
 		defer cancel()
 
 		if err := api.Shutdown(ctx); err != nil {
-			api.Close() // nolint
+			if err := api.Close(); err != nil {
+				log.Errorw("shutdown", "status", "api shutdown", "err", err)
+			}
 			return fmt.Errorf("could not stop server gracefully: %w", err)
 		}
 	}

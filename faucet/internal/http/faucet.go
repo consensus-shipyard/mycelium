@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"path"
 
+	"github.com/ethereum/go-ethereum/common"
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/faucet/internal/data"
-	"github.com/filecoin-project/faucet/internal/faucet"
-	"github.com/filecoin-project/faucet/internal/platform/web"
-	"github.com/filecoin-project/go-address"
+	"github.com/consensus-shipyard/calibration/faucet/internal/data"
+	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
+	"github.com/consensus-shipyard/calibration/faucet/internal/platform/web"
 )
 
 type FaucetWebService struct {
@@ -42,13 +42,9 @@ func (h *FaucetWebService) handleFunds(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Infof(">>> %s -> {%s}\n", r.RemoteAddr, req.Address)
 
-	targetAddr, err := address.NewFromString(req.Address)
-	if err != nil {
-		web.RespondError(w, http.StatusBadRequest, err)
-		return
-	}
+	targetAddr := common.HexToAddress(req.Address)
 
-	err = h.faucet.FundAddress(r.Context(), targetAddr)
+	err := h.faucet.FundAddress(r.Context(), targetAddr)
 	if err != nil {
 		h.log.Errorw("Failed to fund address", "addr", targetAddr, "err", err)
 		web.RespondError(w, http.StatusInternalServerError, err)

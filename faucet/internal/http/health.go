@@ -1,43 +1,30 @@
 package http
 
 import (
-	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"os/exec"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/faucet/internal/data"
-	"github.com/filecoin-project/faucet/internal/failure"
-	"github.com/filecoin-project/faucet/internal/platform/lotus"
-	"github.com/filecoin-project/faucet/internal/platform/web"
-	v "github.com/filecoin-project/faucet/pkg/version"
+	"github.com/consensus-shipyard/calibration/faucet/internal/data"
+	"github.com/consensus-shipyard/calibration/faucet/internal/platform/web"
+	"github.com/consensus-shipyard/calibration/faucet/pkg/version"
 )
 
 type Health struct {
-	log      *logging.ZapEventLogger
-	node     lotus.API
-	build    string
-	detector *failure.Detector
-	check    ValidatorHealthCheck
+	log    *logging.ZapEventLogger
+	client *ethclient.Client
+	build  string
 }
 
-type ValidatorHealthCheck func() error
-
-func NewHealth(log *logging.ZapEventLogger, node lotus.API, d *failure.Detector, build string, check ...ValidatorHealthCheck) *Health {
+func NewHealth(log *logging.ZapEventLogger, client *ethclient.Client, build string) *Health {
 	h := Health{
-		log:      log,
-		node:     node,
-		build:    build,
-		detector: d,
+		log:    log,
+		client: client,
+		build:  build,
 	}
-	if check == nil {
-		h.check = defaultValidatorHealthCheck
-	} else {
-		h.check = check[0]
-	}
+
 	return &h
 }
 
@@ -52,18 +39,7 @@ func (h *Health) Liveness(w http.ResponseWriter, r *http.Request) {
 
 	statusCode := http.StatusOK
 
-	if err := h.detector.CheckProgress(); err != nil {
-		web.RespondError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	status, err := h.node.NodeStatus(ctx, true)
-	if err != nil {
-		web.RespondError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	version, err := h.node.Version(ctx)
+	block, err := h.client.BlockByNumber(ctx, nil)
 	if err != nil {
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
@@ -71,28 +47,12 @@ func (h *Health) Liveness(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Infow("liveness", "statusCode", statusCode, "method", r.Method, "path", r.URL.Path, "remoteaddr", r.RemoteAddr)
 
-	p, err := h.node.NetPeers(ctx)
-	if err != nil {
-		web.RespondError(w, http.StatusInternalServerError, err)
-		return
-	}
-	id, err := h.node.ID(r.Context())
-	if err != nil {
-		web.RespondError(w, http.StatusInternalServerError, err)
-		return
-	}
-
 	resp := data.LivenessResponse{
-		LotusVersion:         version.String(),
-		Epoch:                status.SyncStatus.Epoch,
-		Behind:               status.SyncStatus.Behind,
-		PeersToPublishMsgs:   status.PeerStatus.PeersToPublishMsgs,
-		PeersToPublishBlocks: status.PeerStatus.PeersToPublishBlocks,
-		PeerNumber:           len(p),
-		Host:                 host,
-		Build:                h.build,
-		PeerID:               id.String(),
-		ServiceVersion:       v.Version(),
+		Host:            host,
+		Build:           h.build,
+		LastBlockTime:   block.ReceivedAt.String(),
+		LastBlockNumber: block.NumberU64(),
+		ServiceVersion:  version.Version(),
 	}
 
 	if err := web.Respond(r.Context(), w, resp, http.StatusOK); err != nil {
@@ -107,28 +67,6 @@ func (h *Health) Readiness(w http.ResponseWriter, r *http.Request) {
 
 	h.log.Infow("readiness", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
 
-	ready := true
-	if _, err := h.node.Version(ctx); err != nil {
-		h.log.Errorw("failed to connect to daemon", "source", "readiness", "ERROR", err)
-		ready = false
-	}
-
-	// A node can be a bootstrap node or validator node. Bootstrap nodes run daemons only.
-	// We signal that a node is a bootstrap node by accessing /readiness endpoint with "boostrap" parameter.
-	isBootstrap := r.URL.Query().Get("bootstrap") != ""
-
-	if !isBootstrap {
-		if err := h.checkValidatorStatus(); err != nil {
-			h.log.Errorw("failed to connect to validator", "source", "readiness", "ERROR", err)
-			ready = false
-		}
-	}
-
-	if !ready {
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
 	resp := struct {
 		Status string `json:"status"`
 	}{
@@ -139,33 +77,4 @@ func (h *Health) Readiness(w http.ResponseWriter, r *http.Request) {
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
 	}
-}
-
-func (h *Health) checkValidatorStatus() error {
-	return h.check()
-}
-
-func defaultValidatorHealthCheck() error {
-	grep := exec.Command("grep", "[e]udico mir validator")
-	ps := exec.Command("ps", "ax")
-
-	pipe, _ := ps.StdoutPipe()
-	defer func(pipe io.ReadCloser) {
-		pipe.Close() // nolint
-	}(pipe)
-
-	grep.Stdin = pipe
-	if err := ps.Start(); err != nil {
-		return err
-	}
-
-	// Run and get the output of grep.
-	o, err := grep.Output()
-	if err != nil {
-		return err
-	}
-	if o == nil {
-		return fmt.Errorf("validator not found")
-	}
-	return nil
 }

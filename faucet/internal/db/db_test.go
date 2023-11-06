@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	datastore "github.com/ipfs/go-ds-leveldb"
 	"github.com/stretchr/testify/require"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
-	"github.com/filecoin-project/faucet/internal/data"
-	"github.com/filecoin-project/go-address"
+	"github.com/consensus-shipyard/calibration/faucet/internal/data"
 )
 
 const (
 	dbTestStorePath = "./_db_test_store"
-	dbTestAddr1     = "f1akaouty2buxxwb46l27pzrhl3te2lw5jem67xuy"
+	dbTestAddr1     = "0x4592d8f8d7b001e72cb26a73e4fa1806a51ac79d"
 )
 
 func Test_Faucet(t *testing.T) {
@@ -39,8 +39,7 @@ func Test_Faucet(t *testing.T) {
 
 	ctx := context.Background()
 
-	addr, err := address.NewFromString(dbTestAddr1)
-	require.NoError(t, err)
+	addr := common.HexToAddress(dbTestAddr1)
 
 	addrInfo, err := db.GetAddrInfo(ctx, addr)
 	require.NoError(t, err)

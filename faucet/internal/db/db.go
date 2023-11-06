@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ipfs/go-datastore"
 	"github.com/pkg/errors"
 
-	"github.com/filecoin-project/faucet/internal/data"
-	"github.com/filecoin-project/go-address"
+	"github.com/consensus-shipyard/calibration/faucet/internal/data"
 )
 
 var (
@@ -42,7 +42,7 @@ func (db *Database) GetTotalInfo(ctx context.Context) (data.TotalInfo, error) {
 	return info, nil
 }
 
-func (db *Database) GetAddrInfo(ctx context.Context, addr address.Address) (data.AddrInfo, error) {
+func (db *Database) GetAddrInfo(ctx context.Context, addr common.Address) (data.AddrInfo, error) {
 	var info data.AddrInfo
 
 	b, err := db.store.Get(ctx, addrKey(addr))
@@ -58,7 +58,7 @@ func (db *Database) GetAddrInfo(ctx context.Context, addr address.Address) (data
 	return info, nil
 }
 
-func (db *Database) UpdateAddrInfo(ctx context.Context, targetAddr address.Address, info data.AddrInfo) error {
+func (db *Database) UpdateAddrInfo(ctx context.Context, targetAddr common.Address, info data.AddrInfo) error {
 	bytes, err := json.Marshal(info)
 	if err != nil {
 		return err
@@ -86,6 +86,6 @@ func (db *Database) UpdateTotalInfo(ctx context.Context, info data.TotalInfo) er
 	return nil
 }
 
-func addrKey(addr address.Address) datastore.Key {
+func addrKey(addr common.Address) datastore.Key {
 	return datastore.NewKey(addr.String() + ":value")
 }

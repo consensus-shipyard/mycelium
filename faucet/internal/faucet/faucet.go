@@ -3,18 +3,19 @@ package faucet
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
-	"github.com/ipfs/go-cid"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 
-	"github.com/filecoin-project/faucet/internal/db"
-	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-state-types/abi"
-	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/consensus-shipyard/calibration/faucet/internal/data"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/consensus-shipyard/calibration/faucet/internal/db"
 )
 
 var (
@@ -23,38 +24,36 @@ var (
 )
 
 type PushWaiter interface {
-	MpoolPushMessage(ctx context.Context, msg *types.Message, spec *api.MessageSendSpec) (*types.SignedMessage, error)
-	StateWaitMsg(ctx context.Context, cid cid.Cid, confidence uint64, limit abi.ChainEpoch, allowReplaced bool) (*api.MsgLookup, error)
+	SendTransaction(ctx context.Context, tx *types.Transaction) error
 }
 
 type Config struct {
-	FaucetAddress          address.Address
 	AllowedOrigins         []string
 	TotalWithdrawalLimit   uint64
 	AddressWithdrawalLimit uint64
 	WithdrawalAmount       uint64
 	BackendAddress         string
+	Account                *data.EthereumAccount
+	ChainID                *big.Int
 }
 
 type Service struct {
 	log    *logging.ZapEventLogger
-	lotus  PushWaiter
+	client *ethclient.Client
 	db     *db.Database
-	faucet address.Address
 	cfg    *Config
 }
 
-func NewService(log *logging.ZapEventLogger, lotus PushWaiter, store datastore.Datastore, cfg *Config) *Service {
+func NewService(log *logging.ZapEventLogger, client *ethclient.Client, store datastore.Datastore, cfg *Config) *Service {
 	return &Service{
 		cfg:    cfg,
 		log:    log,
-		lotus:  lotus,
+		client: client,
 		db:     db.NewDatabase(store),
-		faucet: cfg.FaucetAddress,
 	}
 }
 
-func (s *Service) FundAddress(ctx context.Context, targetAddr address.Address) error {
+func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) error {
 	addrInfo, err := s.db.GetAddrInfo(ctx, targetAddr)
 	if err != nil {
 		return err
@@ -87,10 +86,9 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr address.Address) e
 
 	s.log.Infof("funding %v is allowed", targetAddr)
 
-	err = s.pushMessage(ctx, targetAddr)
-	if err != nil {
-		s.log.Errorw("Error waiting for message to be committed", "err", err)
-		return fmt.Errorf("failt to push message: %w", err)
+	if err = s.transferETH(ctx, targetAddr); err != nil {
+		s.log.Errorw("failed to transfer eth", "err", err)
+		return fmt.Errorf("fail to send tx: %w", err)
 	}
 
 	addrInfo.Amount += s.cfg.WithdrawalAmount
@@ -107,22 +105,37 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr address.Address) e
 	return nil
 }
 
-func (s *Service) pushMessage(ctx context.Context, addr address.Address) error {
-	msg, err := s.lotus.MpoolPushMessage(ctx, &types.Message{
-		To:     addr,
-		From:   s.faucet,
-		Value:  types.FromFil(s.cfg.WithdrawalAmount),
-		Method: 0, // method Send
-		Params: nil,
-	}, nil)
+func (s *Service) transferETH(ctx context.Context, toAddress common.Address) error {
+	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
 	if err != nil {
 		return err
 	}
 
-	if _, err = s.lotus.StateWaitMsg(ctx, msg.Cid(), build.MessageConfidence, abi.ChainEpoch(-1), true); err != nil {
+	value := new(big.Int).SetUint64(s.cfg.WithdrawalAmount)
+
+	gasLimit := uint64(21000) // in units
+	gasPrice, err := s.client.SuggestGasPrice(ctx)
+	if err != nil {
 		return err
 	}
 
-	s.log.Infof("Address %v funded successfully", addr)
+	var bytes []byte
+	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, bytes)
+
+	// signer := types.LatestSignerForChainID(s.cfg.ChainID)
+
+	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.cfg.Account.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("failed to sign tx: %w", err)
+	}
+
+	err = s.client.SendTransaction(ctx, signedTx)
+	if err != nil {
+		return fmt.Errorf("failed to send tx: %w", err)
+	}
+
+	s.log.Infof("tx sent: %s", signedTx.Hash().Hex())
+	s.log.Infof("faucetAddress %v funded successfully", toAddress)
+
 	return nil
 }

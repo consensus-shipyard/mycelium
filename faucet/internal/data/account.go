@@ -15,6 +15,9 @@ type EthereumAccount struct {
 }
 
 func NewAccount(key string) (*EthereumAccount, error) {
+	if key == "" {
+		return nil, fmt.Errorf("empty private key")
+	}
 	privateKey, err := crypto.HexToECDSA(key)
 	if err != nil {
 		return nil, err

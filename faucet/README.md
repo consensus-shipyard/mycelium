@@ -2,6 +2,10 @@
 
 ## How to Run
 
+## Private Key
+The private key can be provided directly via the CLI or stored in a file. 
+The private key must not contain "0x" and new line characters.
+
 ### Enabled TLS
 ```azure
 go run ./cmd/main.go --tls-enabled --web-allowed-origins "https://frontend" --web-backend-host "https://faucet/fund" \

@@ -31,6 +31,12 @@ demo:
 	go run ./cmd/main.go --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
  	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"
 
+.PHONY: demo-file-key
+demo-file-key:
+	rm -rf ./_db_data
+	go run ./cmd/main.go --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
+ 	--ethereum-private-key-file "/Users/alpha/.faucet.key" --ethereum-api "http://localhost:8545"
+
 .PHONY: demo-tls
 demo-tls:
 	rm -rf ./_db_data

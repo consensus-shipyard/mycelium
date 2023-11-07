@@ -68,8 +68,9 @@ func run(log *logging.ZapEventLogger) error {
 			WithdrawalAmount       uint64 `conf:"default:10"`
 		}
 		Ethereum struct {
-			API        string `conf:"required"`
-			PrivateKey string `conf:"required"`
+			API            string `conf:"required"`
+			PrivateKey     string
+			PrivateKeyFile string
 		}
 		DB struct {
 			Path     string `conf:"default:./_db_data"`
@@ -137,6 +138,17 @@ func run(log *logging.ZapEventLogger) error {
 	client, err := ethclient.Dial(cfg.Ethereum.API)
 	if err != nil {
 		return fmt.Errorf("failed to connect to API: %w", err)
+	}
+
+	if cfg.Ethereum.PrivateKey == "" {
+		if cfg.Ethereum.PrivateKeyFile == "" {
+			return fmt.Errorf("no private key")
+		}
+		k, err := os.ReadFile(cfg.Ethereum.PrivateKeyFile)
+		if err != nil {
+			return fmt.Errorf("failed to read private key file %s: %w", cfg.Ethereum.PrivateKeyFile, err)
+		}
+		cfg.Ethereum.PrivateKey = string(k)
 	}
 
 	account, err := data.NewAccount(cfg.Ethereum.PrivateKey)

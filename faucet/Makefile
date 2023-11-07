@@ -46,6 +46,10 @@ node-start:
 node-stop:
 	docker stop ganache-node
 
+.PHONY: wait-for-it
+wait-for-it:
+	./scripts/wait-for-it.sh -h 127.0.0.1 -p 8545
+	sleep 3
 
 .PHONY: test
-test: node-start go-test node-stop
+test: node-start wait-for-it go-test node-stop

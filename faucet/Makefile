@@ -4,6 +4,10 @@ all: tidy fmt lint tests
 tidy:
 	go mod tidy
 
+.PHONY: build
+build:
+	go build -o ./faucet ./cmd/main.go
+
 .PHONY: api-tests
 api-tests:
 	go test -v -shuffle=on -count=1 -race -timeout 20m ./internal/tests
@@ -63,9 +67,9 @@ wait-for-faucet:
 	sleep 3
 
 .PHONY: faucet-test-start
-faucet-test-start:
+faucet-test-start: build
 	rm -rf ./_db_data
-	go run ./cmd/main.go --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
+	./faucet --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
  	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"\
  	--faucet-transfer-amount 132 &
 

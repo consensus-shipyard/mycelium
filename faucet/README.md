@@ -29,6 +29,8 @@ Run `make all` to ensure that tests pass and `make demo` to run a demo accessibl
 
 ## Ganache Test Accounts
 
+These accounts and keys are used for local demos and testing.
+
 ```azure
 Available Accounts
 ==================

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,11 +26,12 @@ import (
 )
 
 type FaucetTests struct {
-	handler   http.Handler
-	store     *datastore.Datastore
-	db        *faucetDB.Database
-	faucetCfg *faucet.Config
-	client    *ethclient.Client
+	handler        http.Handler
+	store          *datastore.Datastore
+	db             *faucetDB.Database
+	faucetCfg      *faucet.Config
+	client         *ethclient.Client
+	transferAmount *big.Int
 }
 
 const (
@@ -40,10 +42,13 @@ const (
 	TestAddr2 = "0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b"
 
 	storePath = "./_store"
+
+	localEthereumNodeURL  = "http://localhost:8545"
+	ganacheDefaultChainID = 1337
 )
 
 func newClient() (*ethclient.Client, error) {
-	return ethclient.Dial("http://localhost:8545")
+	return ethclient.Dial(localEthereumNodeURL)
 }
 
 func Test_Faucet(t *testing.T) {
@@ -54,13 +59,6 @@ func Test_Faucet(t *testing.T) {
 		ReadOnly:    false,
 	})
 	require.NoError(t, err)
-
-	defer func() {
-		err = store.Close()
-		require.NoError(t, err)
-		err = os.RemoveAll(storePath)
-		require.NoError(t, err)
-	}()
 
 	log := logging.Logger("TEST-FAUCET")
 
@@ -87,15 +85,23 @@ func Test_Faucet(t *testing.T) {
 
 	db := faucetDB.NewDatabase(store)
 
+	defer func() {
+		err = store.Close()
+		require.NoError(t, err)
+		err = os.RemoveAll(storePath)
+		require.NoError(t, err)
+	}()
+
 	tests := FaucetTests{
-		handler:   srv,
-		store:     store,
-		db:        db,
-		faucetCfg: &cfg,
-		client:    client,
+		handler:        srv,
+		store:          store,
+		db:             db,
+		faucetCfg:      &cfg,
+		client:         client,
+		transferAmount: new(big.Int).SetUint64(cfg.WithdrawalAmount),
 	}
 
-	t.Run("client", tests.clientAvailable)
+	t.Run("clientAvailable", tests.clientAvailable)
 	t.Run("fundEmptyAddress", tests.emptyAddress)
 	t.Run("fundAddress201", tests.fundAddress201)
 	t.Run("fundAddressWithMoreThanAllowed", tests.fundAddressWithMoreThanAllowed)
@@ -104,8 +110,9 @@ func Test_Faucet(t *testing.T) {
 }
 
 func (ft *FaucetTests) clientAvailable(t *testing.T) {
-	_, err := ft.client.ChainID(context.Background())
+	id, err := ft.client.ChainID(context.Background())
 	require.NoError(t, err)
+	require.Equal(t, big.NewInt(ganacheDefaultChainID), id)
 }
 
 func (ft *FaucetTests) liveness(t *testing.T) {
@@ -136,6 +143,12 @@ func (ft *FaucetTests) emptyAddress(t *testing.T) {
 }
 
 func (ft *FaucetTests) fundAddress201(t *testing.T) {
+	block, err := ft.client.BlockByNumber(context.Background(), nil)
+	require.NoError(t, err)
+
+	oldBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(TestAddr1), block.Number())
+	require.NoError(t, err)
+
 	req := data.FundRequest{Address: TestAddr1}
 
 	body, err := json.Marshal(&req)
@@ -149,6 +162,14 @@ func (ft *FaucetTests) fundAddress201(t *testing.T) {
 	ft.handler.ServeHTTP(w, r)
 
 	require.Equal(t, http.StatusCreated, w.Code)
+
+	block, err = ft.client.BlockByNumber(context.Background(), nil)
+	require.NoError(t, err)
+
+	newBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(TestAddr1), block.Number())
+	require.NoError(t, err)
+
+	require.Equal(t, new(big.Int).Add(oldBalance, ft.transferAmount), newBalance)
 }
 
 // fundAddressWithMoreThanAllowed tests that exceeding daily allowed funds per address is not allowed.

@@ -65,7 +65,7 @@ func run(log *logging.ZapEventLogger) error {
 			// Amount of tokens that below is in FIL.
 			TotalWithdrawalLimit   uint64 `conf:"default:10000"`
 			AddressWithdrawalLimit uint64 `conf:"default:20"`
-			WithdrawalAmount       uint64 `conf:"default:10"`
+			TransferAmount         uint64 `conf:"default:10"`
 		}
 		Ethereum struct {
 			API            string `conf:"required"`
@@ -189,7 +189,7 @@ func run(log *logging.ZapEventLogger) error {
 			BackendAddress:         cfg.Web.BackendHost,
 			TotalWithdrawalLimit:   cfg.Faucet.TotalWithdrawalLimit,
 			AddressWithdrawalLimit: cfg.Faucet.AddressWithdrawalLimit,
-			WithdrawalAmount:       cfg.Faucet.WithdrawalAmount,
+			WithdrawalAmount:       cfg.Faucet.TransferAmount,
 			Account:                account,
 			ChainID:                chainID,
 		})),

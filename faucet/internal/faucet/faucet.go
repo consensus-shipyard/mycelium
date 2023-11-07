@@ -23,10 +23,6 @@ var (
 	ErrExceedAddrAllowedFunds  = fmt.Errorf("transaction to exceeds daily allowed funds per address")
 )
 
-type PushWaiter interface {
-	SendTransaction(ctx context.Context, tx *types.Transaction) error
-}
-
 type Config struct {
 	AllowedOrigins         []string
 	TotalWithdrawalLimit   uint64
@@ -58,7 +54,7 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 	if err != nil {
 		return err
 	}
-	s.log.Infof("target address info: %v", addrInfo)
+	s.log.Infof("funding address info: %v", addrInfo)
 
 	totalInfo, err := s.db.GetTotalInfo(ctx)
 	if err != nil {

@@ -35,7 +35,7 @@ demo:
 demo-file-key:
 	rm -rf ./_db_data
 	go run ./cmd/main.go --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
- 	--ethereum-private-key-file "/Users/alpha/.faucet.key" --ethereum-api "http://localhost:8545"
+ 	--ethereum-private-key-file "~/.faucet.key" --ethereum-api "http://localhost:8545"
 
 .PHONY: demo-tls
 demo-tls:
@@ -52,10 +52,33 @@ node-start:
 node-stop:
 	docker stop ganache-node
 
-.PHONY: wait-for-it
-wait-for-it:
+.PHONY: wait-for-node
+wait-for-node:
 	./scripts/wait-for-it.sh -h 127.0.0.1 -p 8545
 	sleep 3
 
+.PHONY: wait-for-faucet
+wait-for-faucet:
+	./scripts/wait-for-it.sh -h 127.0.0.1 -p 8000
+	sleep 3
+
 .PHONY: test
-test: node-start wait-for-it go-test node-stop
+test: node-start wait-for-node go-test node-stop
+
+.PHONY: faucet-itest-start
+faucet-itest-start:
+	rm -rf ./_db_data
+	go run ./cmd/main.go --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
+ 	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"\
+ 	--faucet-transfer-amount 132 &
+
+.PHONY: faucet-itest-stop
+faucet-itest-stop:
+	pgrep -f "ethereum-private-key b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" | xargs kill -9
+
+.PHONY: go-itest
+go-itest:
+	go test -v -shuffle=on -count=1 -race -timeout 20m ./itests/smoke_test.go
+
+.PHONY: itest
+itest: node-start wait-for-node faucet-itest-start wait-for-faucet go-itest faucet-itest-stop node-stop

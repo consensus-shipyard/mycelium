@@ -1,0 +1,59 @@
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  tests-go-stable:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: faucet
+    strategy:
+      matrix:
+        go: [ '1.19' ]
+    steps:
+      - name: Set up Golang
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Test
+        run: make tests
+
+      - name: Retain event logs of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: event-log-go-1.19
+          path: failed-test-data
+  tests-go-latest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: faucet
+    steps:
+      - name: Set up Golang
+        uses: actions/setup-go@v3
+        with:
+          go-version:   1.19
+          check-latest: true
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Test
+        run: make tests
+
+      - name: Retain event logs of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: event-log-go-latest
+          path: failed-test-data

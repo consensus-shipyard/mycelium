@@ -68,9 +68,8 @@ func run(log *logging.ZapEventLogger) error {
 			WithdrawalAmount       uint64 `conf:"default:10"`
 		}
 		Ethereum struct {
-			APIHost    string `conf:"default:https://mainnet.infura.io"`
-			APIToken   string
-			PrivateKey string
+			API        string `conf:"required"`
+			PrivateKey string `conf:"required"`
 		}
 		DB struct {
 			Path     string `conf:"default:./_db_data"`
@@ -135,7 +134,7 @@ func run(log *logging.ZapEventLogger) error {
 	// =========================================================================
 	// Start Ethereum client
 
-	client, err := ethclient.Dial(cfg.Ethereum.APIHost)
+	client, err := ethclient.Dial(cfg.Ethereum.API)
 	if err != nil {
 		return fmt.Errorf("failed to connect to API: %w", err)
 	}

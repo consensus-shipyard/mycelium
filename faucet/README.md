@@ -2,14 +2,15 @@
 
 ## How to Run
 
-## Private Key
-The private key can be provided directly via the CLI or stored in a file. 
-The private key must not contain "0x" and new line characters.
+### Private Key
+ - The private key can be provided directly via CLI or stored in a file. 
+ - The private key must not contain "0x"
+ - The private key file must not contain new line characters.
 
 ### Enabled TLS
 ```azure
 go run ./cmd/main.go --tls-enabled --web-allowed-origins "https://frontend" --web-backend-host "https://faucet/fund" \
-    -- --tls-cert-file "path_to_cert.pem" --tls-key-file "path_to_key.pem" \
+    --tls-cert-file "path_to_cert.pem" --tls-key-file "path_to_key.pem" \
     --ethereum-private-key "key" --ethereum-url "url"
 ```
 ### Disabled TLS

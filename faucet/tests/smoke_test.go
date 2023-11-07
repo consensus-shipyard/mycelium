@@ -1,4 +1,4 @@
-package itests
+package tests
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ const (
 	TestAddr4 = "0xd03ea8624C8C5987235048901fB614fDcA89b117"
 )
 
-func TestSmoke_Service(t *testing.T) {
+func Test_Smoke_Service(t *testing.T) {
 	ctx := context.Background()
 
 	transferAmount := new(big.Int).SetUint64(132)
@@ -52,10 +52,10 @@ func sendRequest(t *testing.T, to string) {
 
 	r, err := http.NewRequest("POST", "http://localhost:8000/fund", bytes.NewBuffer(body))
 	require.NoError(t, err)
+
 	r.Header.Add("Content-Type", "application/json")
 
 	httpClient := &http.Client{}
-
 	res, err := httpClient.Do(r)
 	require.NoError(t, err)
 

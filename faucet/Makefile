@@ -1,11 +1,11 @@
-all: tidy fmt lint test
+all: tidy fmt lint tests
 
 .PHONY: tidy
 tidy:
 	go mod tidy
 
-.PHONY: go-tests
-go-tests:
+.PHONY: api-tests
+api-tests:
 	go test -v -shuffle=on -count=1 -race -timeout 20m ./internal/tests
 
 .PHONY: fmt
@@ -62,20 +62,20 @@ wait-for-faucet:
 	./scripts/wait-for-it.sh -h 127.0.0.1 -p 8000
 	sleep 3
 
-.PHONY: faucet-itest-start
-faucet-itest-start:
+.PHONY: faucet-test-start
+faucet-test-start:
 	rm -rf ./_db_data
 	go run ./cmd/main.go --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
  	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"\
  	--faucet-transfer-amount 132 &
 
-.PHONY: faucet-itest-stop
-faucet-itest-stop:
-	pgrep -f "ethereum-private-key b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" | xargs kill -9
+.PHONY: faucet-test-stop
+faucet-test-stop:
+	pgrep -o -f "ethereum-private-key b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" | xargs kill -9
 
-.PHONY: go-itests
-go-itests:
-	go test -v -shuffle=on -count=1 -race -timeout 20m ./itests/smoke_test.go
+.PHONY: e2e-tests
+e2e-tests:
+	go test -v -shuffle=on -count=1 -race -timeout 20m ./tests/smoke_test.go
 
 .PHONY: tests
-tests: node-start wait-for-node go-tests faucet-itest-start wait-for-faucet go-itests faucet-itest-stop node-stop
+tests: node-start wait-for-node api-tests faucet-test-start wait-for-faucet e2e-tests faucet-test-stop node-stop

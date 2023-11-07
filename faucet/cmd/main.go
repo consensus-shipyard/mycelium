@@ -76,6 +76,9 @@ func run(log *logging.ZapEventLogger) error {
 			Path     string `conf:"default:./_db_data"`
 			Readonly bool   `conf:"default:false"`
 		}
+		Logging struct {
+			Level string `conf:"default:info"`
+		}
 	}{
 		Version: conf.Version{
 			Build: build,
@@ -98,12 +101,19 @@ func run(log *logging.ZapEventLogger) error {
 
 	ctx := context.Background()
 
-	log.Infow("starting service", "version", build)
-	defer log.Infow("shutdown complete")
-
 	out, err := conf.String(&cfg)
 	if err != nil {
 		return fmt.Errorf("generating config for output: %w", err)
+	}
+	log.Infow("starting service", "version", build)
+	defer log.Infow("shutdown complete")
+
+	if cfg.Logging.Level != "info" {
+		lvl, err := logging.LevelFromString("info")
+		if err != nil {
+			return fmt.Errorf("failed to parse log level: %w", err)
+		}
+		logging.SetAllLoggers(lvl)
 	}
 	log.Infow("startup", "config", out)
 

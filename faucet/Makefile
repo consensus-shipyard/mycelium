@@ -4,9 +4,9 @@ all: tidy fmt lint test
 tidy:
 	go mod tidy
 
-.PHONY: go-test
-go-test:
-	go test -v -shuffle=on -count=1 -race -timeout 20m ./...
+.PHONY: go-tests
+go-tests:
+	go test -v -shuffle=on -count=1 -race -timeout 20m ./internal/tests
 
 .PHONY: fmt
 fmt:
@@ -62,9 +62,6 @@ wait-for-faucet:
 	./scripts/wait-for-it.sh -h 127.0.0.1 -p 8000
 	sleep 3
 
-.PHONY: test
-test: node-start wait-for-node go-test node-stop
-
 .PHONY: faucet-itest-start
 faucet-itest-start:
 	rm -rf ./_db_data
@@ -76,9 +73,9 @@ faucet-itest-start:
 faucet-itest-stop:
 	pgrep -f "ethereum-private-key b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" | xargs kill -9
 
-.PHONY: go-itest
-go-itest:
+.PHONY: go-itests
+go-itests:
 	go test -v -shuffle=on -count=1 -race -timeout 20m ./itests/smoke_test.go
 
-.PHONY: itest
-itest: node-start wait-for-node faucet-itest-start wait-for-faucet go-itest faucet-itest-stop node-stop
+.PHONY: tests
+tests: node-start wait-for-node go-tests faucet-itest-start wait-for-faucet go-itests faucet-itest-stop node-stop

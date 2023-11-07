@@ -1,8 +1,10 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	logging "github.com/ipfs/go-log/v2"
@@ -41,11 +43,12 @@ func (h *Health) Liveness(w http.ResponseWriter, r *http.Request) {
 
 	block, err := h.client.BlockByNumber(ctx, nil)
 	if err != nil {
+		h.log.Infow("liveness failure", "status", "eth client not ready")
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	h.log.Infow("liveness", "statusCode", statusCode, "method", r.Method, "path", r.URL.Path, "remoteaddr", r.RemoteAddr)
+	h.log.Infow("liveness check", "statusCode", statusCode, "method", r.Method, "path", r.URL.Path, "remoteaddr", r.RemoteAddr)
 
 	resp := data.LivenessResponse{
 		Host:            host,
@@ -55,7 +58,7 @@ func (h *Health) Liveness(w http.ResponseWriter, r *http.Request) {
 		ServiceVersion:  version.Version(),
 	}
 
-	if err := web.Respond(r.Context(), w, resp, http.StatusOK); err != nil {
+	if err := web.Respond(r.Context(), w, resp, statusCode); err != nil {
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -63,17 +66,29 @@ func (h *Health) Liveness(w http.ResponseWriter, r *http.Request) {
 
 // Readiness checks if the components are ready and if not will return a 500 status.
 func (h *Health) Readiness(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
 
-	h.log.Infow("readiness", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
+	status := "ok"
+	statusCode := http.StatusOK
+
+	h.log.Infow("readiness check", "method", r.Method, "path", r.URL.Path, "remote", r.RemoteAddr)
+
+	if _, err := h.client.BlockByNumber(ctx, nil); err != nil {
+		status = "eth client not ready"
+		statusCode = http.StatusInternalServerError
+		h.log.Infow("readiness failure", "status", status)
+		web.RespondError(w, statusCode, err)
+		return
+	}
 
 	resp := struct {
 		Status string `json:"status"`
 	}{
-		Status: "ok",
+		Status: status,
 	}
 
-	if err := web.Respond(ctx, w, resp, http.StatusOK); err != nil {
+	if err := web.Respond(ctx, w, resp, statusCode); err != nil {
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
 	}

@@ -121,6 +121,7 @@ func (ft *FaucetTests) addrsBaseline(t *testing.T) {
 	require.NoError(t, err)
 
 	ethAddr2, err := types.EthAddressFromFilecoinAddress(filecoinAddr)
+	require.NoError(t, err)
 	require.Equal(t, ethAddr2, ethAddr1)
 	require.True(t, strings.EqualFold(TestAddr1, ethAddr2.ToHex()))
 }

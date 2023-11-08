@@ -50,8 +50,8 @@ func Test_Faucet(t *testing.T) {
 	require.Equal(t, data.TotalInfo{}, totalInfo)
 
 	newAddrInfo := data.AddrInfo{
-		Amount:           12,
-		LatestWithdrawal: time.Now(),
+		Amount:         12,
+		LatestTransfer: time.Now(),
 	}
 	err = db.UpdateAddrInfo(ctx, addr, newAddrInfo)
 	require.NoError(t, err)
@@ -59,11 +59,11 @@ func Test_Faucet(t *testing.T) {
 	addrInfo, err = db.GetAddrInfo(ctx, addr)
 	require.NoError(t, err)
 	require.Equal(t, newAddrInfo.Amount, addrInfo.Amount)
-	require.Equal(t, true, newAddrInfo.LatestWithdrawal.Equal(addrInfo.LatestWithdrawal))
+	require.Equal(t, true, newAddrInfo.LatestTransfer.Equal(addrInfo.LatestTransfer))
 
 	newTotalInfo := data.TotalInfo{
-		Amount:           3000,
-		LatestWithdrawal: time.Now(),
+		Amount:         3000,
+		LatestTransfer: time.Now(),
 	}
 	err = db.UpdateTotalInfo(ctx, newTotalInfo)
 	require.NoError(t, err)
@@ -71,5 +71,5 @@ func Test_Faucet(t *testing.T) {
 	totalInfo, err = db.GetTotalInfo(ctx)
 	require.NoError(t, err)
 	require.Equal(t, newTotalInfo.Amount, totalInfo.Amount)
-	require.Equal(t, true, newTotalInfo.LatestWithdrawal.Equal(totalInfo.LatestWithdrawal))
+	require.Equal(t, true, newTotalInfo.LatestTransfer.Equal(totalInfo.LatestTransfer))
 }

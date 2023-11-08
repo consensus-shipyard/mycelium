@@ -24,13 +24,13 @@ var (
 )
 
 type Config struct {
-	AllowedOrigins         []string
-	TotalWithdrawalLimit   uint64
-	AddressWithdrawalLimit uint64
-	WithdrawalAmount       uint64
-	BackendAddress         string
-	Account                *data.EthereumAccount
-	ChainID                *big.Int
+	AllowedOrigins       []string
+	TotalTransferLimit   uint64
+	AddressTransferLimit uint64
+	TransferAmount       uint64
+	BackendAddress       string
+	Account              *data.EthereumAccount
+	ChainID              *big.Int
 }
 
 type Service struct {
@@ -62,21 +62,21 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 	}
 	s.log.Infof("total info: %v", totalInfo)
 
-	if addrInfo.LatestWithdrawal.IsZero() || time.Since(addrInfo.LatestWithdrawal) >= 24*time.Hour {
+	if addrInfo.LatestTransfer.IsZero() || time.Since(addrInfo.LatestTransfer) >= 24*time.Hour {
 		addrInfo.Amount = 0
-		addrInfo.LatestWithdrawal = time.Now()
+		addrInfo.LatestTransfer = time.Now()
 	}
 
-	if totalInfo.LatestWithdrawal.IsZero() || time.Since(totalInfo.LatestWithdrawal) >= 24*time.Hour {
+	if totalInfo.LatestTransfer.IsZero() || time.Since(totalInfo.LatestTransfer) >= 24*time.Hour {
 		totalInfo.Amount = 0
-		totalInfo.LatestWithdrawal = time.Now()
+		totalInfo.LatestTransfer = time.Now()
 	}
 
-	if totalInfo.Amount >= s.cfg.TotalWithdrawalLimit {
+	if totalInfo.Amount >= s.cfg.TotalTransferLimit {
 		return ErrExceedTotalAllowedFunds
 	}
 
-	if addrInfo.Amount >= s.cfg.AddressWithdrawalLimit {
+	if addrInfo.Amount >= s.cfg.AddressTransferLimit {
 		return ErrExceedAddrAllowedFunds
 	}
 
@@ -87,8 +87,8 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 		return fmt.Errorf("fail to send tx: %w", err)
 	}
 
-	addrInfo.Amount += s.cfg.WithdrawalAmount
-	totalInfo.Amount += s.cfg.WithdrawalAmount
+	addrInfo.Amount += s.cfg.TransferAmount
+	totalInfo.Amount += s.cfg.TransferAmount
 
 	if err = s.db.UpdateAddrInfo(ctx, targetAddr, addrInfo); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 		return fmt.Errorf("failed to retrieve nonce: %w", err)
 	}
 
-	amount := new(big.Int).SetUint64(s.cfg.WithdrawalAmount)
+	amount := new(big.Int).SetUint64(s.cfg.TransferAmount)
 
 	gasLimit := uint64(21000) // in units
 

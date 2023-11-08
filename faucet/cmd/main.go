@@ -63,9 +63,9 @@ func run(log *logging.ZapEventLogger) error {
 		}
 		Faucet struct {
 			// Amount of tokens that below is in FIL.
-			TotalWithdrawalLimit   uint64 `conf:"default:10000"`
-			AddressWithdrawalLimit uint64 `conf:"default:20"`
-			TransferAmount         uint64 `conf:"default:10"`
+			TotalTransferLimit   uint64 `conf:"default:10000"`
+			AddressTransferLimit uint64 `conf:"default:20"`
+			TransferAmount       uint64 `conf:"default:10"`
 		}
 		Ethereum struct {
 			API            string `conf:"required"`
@@ -202,13 +202,13 @@ func run(log *logging.ZapEventLogger) error {
 		TLSConfig: tlsConfig,
 		Addr:      cfg.Web.Host,
 		Handler: handlers.RecoveryHandler()(app.FaucetHandler(log, client, db, build, &faucet.Config{
-			AllowedOrigins:         cfg.Web.AllowedOrigins,
-			BackendAddress:         cfg.Web.BackendHost,
-			TotalWithdrawalLimit:   cfg.Faucet.TotalWithdrawalLimit,
-			AddressWithdrawalLimit: cfg.Faucet.AddressWithdrawalLimit,
-			WithdrawalAmount:       cfg.Faucet.TransferAmount,
-			Account:                account,
-			ChainID:                chainID,
+			AllowedOrigins:       cfg.Web.AllowedOrigins,
+			BackendAddress:       cfg.Web.BackendHost,
+			TotalTransferLimit:   cfg.Faucet.TotalTransferLimit,
+			AddressTransferLimit: cfg.Faucet.AddressTransferLimit,
+			TransferAmount:       cfg.Faucet.TransferAmount,
+			Account:              account,
+			ChainID:              chainID,
 		})),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,

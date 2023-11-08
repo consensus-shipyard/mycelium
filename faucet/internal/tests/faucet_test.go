@@ -74,11 +74,11 @@ func Test_Faucet(t *testing.T) {
 	require.NoError(t, err)
 
 	cfg := faucet.Config{
-		TotalWithdrawalLimit:   1000,
-		AddressWithdrawalLimit: 20,
-		WithdrawalAmount:       10,
-		Account:                account,
-		ChainID:                chainID,
+		TotalTransferLimit:   1000,
+		AddressTransferLimit: 20,
+		TransferAmount:       10,
+		Account:              account,
+		ChainID:              chainID,
 	}
 
 	srv := handler.FaucetHandler(log, client, store, "0.0.1", &cfg)
@@ -98,7 +98,7 @@ func Test_Faucet(t *testing.T) {
 		db:             db,
 		faucetCfg:      &cfg,
 		client:         client,
-		transferAmount: new(big.Int).SetUint64(cfg.WithdrawalAmount),
+		transferAmount: new(big.Int).SetUint64(cfg.TransferAmount),
 	}
 
 	t.Run("clientAvailable", tests.clientAvailable)
@@ -177,8 +177,8 @@ func (ft *FaucetTests) fundAddressWithMoreThanAllowed(t *testing.T) {
 	targetAddr := common.HexToAddress(TestAddr1)
 
 	err := ft.db.UpdateAddrInfo(context.Background(), targetAddr, data.AddrInfo{
-		Amount:           ft.faucetCfg.AddressWithdrawalLimit,
-		LatestWithdrawal: time.Now(),
+		Amount:         ft.faucetCfg.AddressTransferLimit,
+		LatestTransfer: time.Now(),
 	})
 	require.NoError(t, err)
 
@@ -208,8 +208,8 @@ func (ft *FaucetTests) fundAddressWithMoreThanAllowed(t *testing.T) {
 // fundAddressWithMoreThanAllowed tests that exceeding daily allowed funds per address is not allowed.
 func (ft *FaucetTests) fundAddressWithMoreThanTotal(t *testing.T) {
 	err := ft.db.UpdateTotalInfo(context.Background(), data.TotalInfo{
-		Amount:           ft.faucetCfg.TotalWithdrawalLimit,
-		LatestWithdrawal: time.Now(),
+		Amount:         ft.faucetCfg.TotalTransferLimit,
+		LatestTransfer: time.Now(),
 	})
 	require.NoError(t, err)
 

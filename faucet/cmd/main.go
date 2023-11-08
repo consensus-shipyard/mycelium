@@ -57,7 +57,7 @@ func run(log *logging.ZapEventLogger) error {
 			AllowedOrigins  []string      `conf:"required"`
 		}
 		TLS struct {
-			Disable  bool   `conf:"default:true"`
+			Disabled bool   `conf:"default:true"`
 			CertFile string `conf:"default:nocert.pem"`
 			KeyFile  string `conf:"default:nokey.pem"`
 		}
@@ -168,12 +168,12 @@ func run(log *logging.ZapEventLogger) error {
 
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize private key: %w", err)
+		return fmt.Errorf("failed to get chainID: %w", err)
 	}
 
 	networkID, err := client.NetworkID(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize private key: %w", err)
+		return fmt.Errorf("failed to get networkID: %w", err)
 	}
 
 	log.Infow("startup", "ChainID", chainID, "NetworkID", networkID)
@@ -187,7 +187,8 @@ func run(log *logging.ZapEventLogger) error {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	var tlsConfig *tls.Config
-	if !cfg.TLS.Disable {
+	if !cfg.TLS.Disabled {
+		log.Infow("startup", "status", "initializing TLS")
 		cert, err := tls.LoadX509KeyPair(cfg.TLS.CertFile, cfg.TLS.KeyFile)
 		if err != nil {
 			return fmt.Errorf("failed to load TLS key pair: %w", err)
@@ -220,7 +221,7 @@ func run(log *logging.ZapEventLogger) error {
 
 	go func() {
 		log.Infow("startup", "status", "api router started", "host", api.Addr)
-		switch cfg.TLS.Disable {
+		switch cfg.TLS.Disabled {
 		case true:
 			serverErrors <- api.ListenAndServe()
 		case false:

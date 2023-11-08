@@ -44,8 +44,9 @@ demo-file-key:
 .PHONY: demo-tls
 demo-tls:
 	rm -rf ./_db_data
-	go run ./cmd/main.go --web-allowed-origins "https://localhost" --web-backend-host "https://localhost:443/fund" \
-	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"
+	go run ./cmd/main.go --web-allowed-origins "https://localhost:8000" --web-backend-host "https://localhost:8000/fund" \
+	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545" \
+	--tls-disabled=false --tls-cert-file="./_cert/cert.pem" --tls-key-file="./_cert/key.pem"
 
 .PHONY: node-start
 node-start:

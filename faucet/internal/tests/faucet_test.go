@@ -19,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	ldbopts "github.com/syndtr/goleveldb/leveldb/opt"
 
+	"github.com/consensus-shipyard/calibration/faucet/internal/types"
+
 	"github.com/consensus-shipyard/calibration/faucet/internal/data"
 	faucetDB "github.com/consensus-shipyard/calibration/faucet/internal/db"
 	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
@@ -35,16 +37,9 @@ type FaucetTests struct {
 }
 
 const (
-	FaucetAccount    = "0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1"
-	FaucetPrivateKey = "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d"
-
-	TestAddr1 = "0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0"
-	TestAddr2 = "0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b"
-
-	storePath = "./_store"
-
+	storePath             = "./_store"
 	localEthereumNodeURL  = "http://localhost:8545"
-	ganacheDefaultChainID = 1337
+	ganacheDefaultChainID = 1
 )
 
 func newClient() (*ethclient.Client, error) {
@@ -70,15 +65,15 @@ func Test_Faucet(t *testing.T) {
 	client, err := newClient()
 	require.NoError(t, err)
 
-	chainID, err := client.NetworkID(context.Background())
+	chainID, err := client.ChainID(context.Background())
 	require.NoError(t, err)
 
 	cfg := faucet.Config{
-		TotalWithdrawalLimit:   1000,
-		AddressWithdrawalLimit: 20,
-		WithdrawalAmount:       10,
-		Account:                account,
-		ChainID:                chainID,
+		TotalTransferLimit:   1000,
+		AddressTransferLimit: 50,
+		TransferAmount:       10,
+		Account:              account,
+		ChainID:              chainID,
 	}
 
 	srv := handler.FaucetHandler(log, client, store, "0.0.1", &cfg)
@@ -98,12 +93,14 @@ func Test_Faucet(t *testing.T) {
 		db:             db,
 		faucetCfg:      &cfg,
 		client:         client,
-		transferAmount: new(big.Int).SetUint64(cfg.WithdrawalAmount),
+		transferAmount: faucet.TransferAmount(cfg.TransferAmount),
 	}
 
+	t.Run("addrsBaseline", tests.addrsBaseline)
 	t.Run("clientAvailable", tests.clientAvailable)
 	t.Run("fundEmptyAddress", tests.emptyAddress)
-	t.Run("fundAddress201", tests.fundAddress201)
+	t.Run("fundAddress201EthAddr", tests.fundAddress201EthAddr)
+	t.Run("fundAddress201FilecoinAddr", tests.fundAddress201FilecoinAddr)
 	t.Run("fundAddressWithMoreThanAllowed", tests.fundAddressWithMoreThanAllowed)
 	t.Run("fundAddressWithMoreThanTotal", tests.fundAddressWithMoreThanTotal)
 	t.Run("liveness", tests.liveness)
@@ -113,6 +110,21 @@ func (ft *FaucetTests) clientAvailable(t *testing.T) {
 	id, err := ft.client.ChainID(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, big.NewInt(ganacheDefaultChainID), id)
+}
+
+func (ft *FaucetTests) addrsBaseline(t *testing.T) {
+	ethAddr1, err := types.NewEthAddressFromHexString(TestAddr1)
+	require.NoError(t, err)
+
+	require.True(t, strings.EqualFold(TestAddr1, ethAddr1.ToHex()))
+
+	filecoinAddr, err := ethAddr1.ToFilecoinAddress()
+	require.NoError(t, err)
+
+	ethAddr2, err := types.EthAddressFromFilecoinAddress(filecoinAddr)
+	require.NoError(t, err)
+	require.Equal(t, ethAddr2, ethAddr1)
+	require.True(t, strings.EqualFold(TestAddr1, ethAddr2.ToHex()))
 }
 
 func (ft *FaucetTests) liveness(t *testing.T) {
@@ -142,14 +154,22 @@ func (ft *FaucetTests) emptyAddress(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func (ft *FaucetTests) fundAddress201(t *testing.T) {
+func (ft *FaucetTests) fundAddress201EthAddr(t *testing.T) {
+	ft.fundAddress(t, TestAddr1, TestAddr1)
+}
+
+func (ft *FaucetTests) fundAddress201FilecoinAddr(t *testing.T) {
+	ft.fundAddress(t, FilecoinTestAddr1, TestAddr1)
+}
+
+func (ft *FaucetTests) fundAddress(t *testing.T, fundAddr, checkAddr string) {
 	block, err := ft.client.BlockByNumber(context.Background(), nil)
 	require.NoError(t, err)
 
-	oldBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(TestAddr1), block.Number())
+	oldBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(checkAddr), block.Number())
 	require.NoError(t, err)
 
-	req := data.FundRequest{Address: TestAddr1}
+	req := data.FundRequest{Address: fundAddr}
 
 	body, err := json.Marshal(&req)
 	if err != nil {
@@ -166,7 +186,7 @@ func (ft *FaucetTests) fundAddress201(t *testing.T) {
 	block, err = ft.client.BlockByNumber(context.Background(), nil)
 	require.NoError(t, err)
 
-	newBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(TestAddr1), block.Number())
+	newBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(checkAddr), block.Number())
 	require.NoError(t, err)
 
 	require.Equal(t, new(big.Int).Add(oldBalance, ft.transferAmount), newBalance)
@@ -177,12 +197,12 @@ func (ft *FaucetTests) fundAddressWithMoreThanAllowed(t *testing.T) {
 	targetAddr := common.HexToAddress(TestAddr1)
 
 	err := ft.db.UpdateAddrInfo(context.Background(), targetAddr, data.AddrInfo{
-		Amount:           ft.faucetCfg.AddressWithdrawalLimit,
-		LatestWithdrawal: time.Now(),
+		Amount:         ft.faucetCfg.AddressTransferLimit,
+		LatestTransfer: time.Now(),
 	})
 	require.NoError(t, err)
 
-	req := data.FundRequest{Address: TestAddr1}
+	req := data.FundRequest{Address: FilecoinTestAddr1}
 
 	body, err := json.Marshal(&req)
 	if err != nil {
@@ -208,12 +228,12 @@ func (ft *FaucetTests) fundAddressWithMoreThanAllowed(t *testing.T) {
 // fundAddressWithMoreThanAllowed tests that exceeding daily allowed funds per address is not allowed.
 func (ft *FaucetTests) fundAddressWithMoreThanTotal(t *testing.T) {
 	err := ft.db.UpdateTotalInfo(context.Background(), data.TotalInfo{
-		Amount:           ft.faucetCfg.TotalWithdrawalLimit,
-		LatestWithdrawal: time.Now(),
+		Amount:         ft.faucetCfg.TotalTransferLimit,
+		LatestTransfer: time.Now(),
 	})
 	require.NoError(t, err)
 
-	req := data.FundRequest{Address: TestAddr2}
+	req := data.FundRequest{Address: FilecoinTestAddr2}
 
 	body, err := json.Marshal(&req)
 	if err != nil {

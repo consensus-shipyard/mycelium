@@ -1,10 +1,10 @@
 package http
 
 import (
-	"errors"
 	"html/template"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	logging "github.com/ipfs/go-log/v2"
@@ -12,6 +12,7 @@ import (
 	"github.com/consensus-shipyard/calibration/faucet/internal/data"
 	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
 	"github.com/consensus-shipyard/calibration/faucet/internal/platform/web"
+	"github.com/consensus-shipyard/calibration/faucet/internal/types"
 )
 
 type FaucetWebService struct {
@@ -30,23 +31,29 @@ func NewWebService(log *logging.ZapEventLogger, faucet *faucet.Service, backendA
 
 func (h *FaucetWebService) handleFunds(w http.ResponseWriter, r *http.Request) {
 	var req data.FundRequest
+
 	if err := web.Decode(r, &req); err != nil {
 		web.RespondError(w, http.StatusBadRequest, err)
 		return
 	}
 
-	if req.Address == "" {
-		web.RespondError(w, http.StatusBadRequest, errors.New("empty address"))
-		return
+	var ethAddr common.Address
+	var err error
+
+	if strings.HasPrefix(req.Address, "0x") {
+		ethAddr = common.HexToAddress(req.Address)
+	} else {
+		ethAddr, err = types.EthAddressFromFilecoinAddressString(req.Address)
+		if err != nil {
+			web.RespondError(w, http.StatusBadRequest, err)
+			return
+		}
 	}
 
-	h.log.Infof(">>> %s -> {%s}\n", r.RemoteAddr, req.Address)
+	h.log.Infof("%s requests funds for %s", r.RemoteAddr, ethAddr)
 
-	targetAddr := common.HexToAddress(req.Address)
-
-	err := h.faucet.FundAddress(r.Context(), targetAddr)
-	if err != nil {
-		h.log.Errorw("Failed to fund address", "addr", targetAddr, "err", err)
+	if err = h.faucet.FundAddress(r.Context(), ethAddr); err != nil {
+		h.log.Errorw("failed to fund address", "addr", ethAddr, "err", err)
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
 	}

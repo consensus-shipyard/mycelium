@@ -44,13 +44,14 @@ demo-file-key:
 .PHONY: demo-tls
 demo-tls:
 	rm -rf ./_db_data
-	go run ./cmd/main.go --web-allowed-origins "https://localhost" --web-backend-host "https://localhost:443/fund" \
-	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"
+	go run ./cmd/main.go --web-allowed-origins "https://localhost:8000" --web-backend-host "https://localhost:8000/fund" \
+	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545" \
+	--tls-disabled=false --tls-cert-file="./_cert/cert.pem" --tls-key-file="./_cert/key.pem"
 
 .PHONY: node-start
 node-start:
 	docker run --name ganache-node --rm --detach --publish 8545:8545 trufflesuite/ganache:latest \
- 		--accounts 10 --wallet.deterministic
+ 		--accounts 10 --wallet.deterministic --chain.chainId 1
 
 .PHONY: node-stop
 node-stop:
@@ -71,7 +72,7 @@ faucet-test-start: build
 	rm -rf ./_db_data
 	./faucet --web-host "127.0.0.1:8000" --web-allowed-origins "http://localhost:8000" --web-backend-host "http://localhost:8000/fund" \
  	--ethereum-private-key "b0057716d5917badaf911b193b12b910811c1497b5bada8d7711f758981c3773" --ethereum-api "http://localhost:8545"\
- 	--faucet-transfer-amount 132 &
+ 	--faucet-transfer-amount 13 >> faucet-test-log.txt 2>&1 &
 
 .PHONY: faucet-test-stop
 faucet-test-stop:

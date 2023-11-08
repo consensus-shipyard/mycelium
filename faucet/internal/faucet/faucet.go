@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 
@@ -24,13 +25,13 @@ var (
 )
 
 type Config struct {
-	AllowedOrigins         []string
-	TotalWithdrawalLimit   uint64
-	AddressWithdrawalLimit uint64
-	WithdrawalAmount       uint64
-	BackendAddress         string
-	Account                *data.EthereumAccount
-	ChainID                *big.Int
+	AllowedOrigins       []string
+	TotalTransferLimit   uint64
+	AddressTransferLimit uint64
+	TransferAmount       uint64
+	BackendAddress       string
+	Account              *data.EthereumAccount
+	ChainID              *big.Int
 }
 
 type Service struct {
@@ -62,21 +63,21 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 	}
 	s.log.Infof("total info: %v", totalInfo)
 
-	if addrInfo.LatestWithdrawal.IsZero() || time.Since(addrInfo.LatestWithdrawal) >= 24*time.Hour {
+	if addrInfo.LatestTransfer.IsZero() || time.Since(addrInfo.LatestTransfer) >= 24*time.Hour {
 		addrInfo.Amount = 0
-		addrInfo.LatestWithdrawal = time.Now()
+		addrInfo.LatestTransfer = time.Now()
 	}
 
-	if totalInfo.LatestWithdrawal.IsZero() || time.Since(totalInfo.LatestWithdrawal) >= 24*time.Hour {
+	if totalInfo.LatestTransfer.IsZero() || time.Since(totalInfo.LatestTransfer) >= 24*time.Hour {
 		totalInfo.Amount = 0
-		totalInfo.LatestWithdrawal = time.Now()
+		totalInfo.LatestTransfer = time.Now()
 	}
 
-	if totalInfo.Amount >= s.cfg.TotalWithdrawalLimit {
+	if totalInfo.Amount >= s.cfg.TotalTransferLimit {
 		return ErrExceedTotalAllowedFunds
 	}
 
-	if addrInfo.Amount >= s.cfg.AddressWithdrawalLimit {
+	if addrInfo.Amount >= s.cfg.AddressTransferLimit {
 		return ErrExceedAddrAllowedFunds
 	}
 
@@ -87,8 +88,8 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 		return fmt.Errorf("fail to send tx: %w", err)
 	}
 
-	addrInfo.Amount += s.cfg.WithdrawalAmount
-	totalInfo.Amount += s.cfg.WithdrawalAmount
+	addrInfo.Amount += s.cfg.TransferAmount
+	totalInfo.Amount += s.cfg.TransferAmount
 
 	if err = s.db.UpdateAddrInfo(ctx, targetAddr, addrInfo); err != nil {
 		return err
@@ -101,26 +102,36 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 	return nil
 }
 
-func (s *Service) transferETH(ctx context.Context, toAddress common.Address) error {
-	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
-	if err != nil {
-		return err
-	}
+func (s *Service) transferETH(ctx context.Context, to common.Address) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*5000*4)
+	defer cancel()
 
-	value := new(big.Int).SetUint64(s.cfg.WithdrawalAmount)
-
-	gasLimit := uint64(21000) // in units
 	gasPrice, err := s.client.SuggestGasPrice(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve gas price: %w", err)
 	}
 
-	var bytes []byte
-	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, bytes)
+	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve nonce: %w", err)
+	}
 
-	// signer := types.LatestSignerForChainID(s.cfg.ChainID)
+	value := TransferAmount(s.cfg.TransferAmount)
 
-	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.cfg.Account.PrivateKey)
+	gasLimit := uint64(21000) // in units
+
+	tx := types.NewTx(&types.LegacyTx{
+		Nonce:    nonce,
+		To:       &to,
+		Value:    value,
+		Gas:      gasLimit,
+		GasPrice: gasPrice,
+		Data:     nil,
+	})
+
+	signer := types.LatestSignerForChainID(s.cfg.ChainID)
+
+	signedTx, err := types.SignTx(tx, signer, s.cfg.Account.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("failed to sign tx: %w", err)
 	}
@@ -131,7 +142,11 @@ func (s *Service) transferETH(ctx context.Context, toAddress common.Address) err
 	}
 
 	s.log.Infof("tx sent: %s", signedTx.Hash().Hex())
-	s.log.Infof("faucetAddress %v funded successfully", toAddress)
+	s.log.Infof("faucetAddress %v funded successfully", to)
 
 	return nil
+}
+
+func TransferAmount(amount uint64) *big.Int {
+	return new(big.Int).Mul(new(big.Int).SetUint64(amount), big.NewInt(params.Ether))
 }

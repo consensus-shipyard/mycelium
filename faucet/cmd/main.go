@@ -57,15 +57,15 @@ func run(log *logging.ZapEventLogger) error {
 			AllowedOrigins  []string      `conf:"required"`
 		}
 		TLS struct {
-			Disable  bool   `conf:"default:true"`
+			Disabled bool   `conf:"default:true"`
 			CertFile string `conf:"default:nocert.pem"`
 			KeyFile  string `conf:"default:nokey.pem"`
 		}
 		Faucet struct {
-			// Amount of tokens that below is in FIL.
-			TotalWithdrawalLimit   uint64 `conf:"default:10000"`
-			AddressWithdrawalLimit uint64 `conf:"default:20"`
-			TransferAmount         uint64 `conf:"default:10"`
+			// Amount of tokens that below is in Eth.
+			TotalTransferLimit   uint64 `conf:"default:9000"` // 9000 Ether
+			AddressTransferLimit uint64 `conf:"default:90"`   // 90 Ether
+			TransferAmount       uint64 `conf:"default:30"`   // 30 Ether
 		}
 		Ethereum struct {
 			API            string `conf:"required"`
@@ -166,10 +166,17 @@ func run(log *logging.ZapEventLogger) error {
 		return fmt.Errorf("failed to initialize account: %w", err)
 	}
 
-	chainID, err := client.NetworkID(ctx)
+	chainID, err := client.ChainID(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize private key: %w", err)
+		return fmt.Errorf("failed to get chainID: %w", err)
 	}
+
+	networkID, err := client.NetworkID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get networkID: %w", err)
+	}
+
+	log.Infow("startup", "ChainID", chainID, "NetworkID", networkID)
 
 	// =========================================================================
 	// Start API Service
@@ -180,7 +187,8 @@ func run(log *logging.ZapEventLogger) error {
 	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
 
 	var tlsConfig *tls.Config
-	if !cfg.TLS.Disable {
+	if !cfg.TLS.Disabled {
+		log.Infow("startup", "status", "initializing TLS")
 		cert, err := tls.LoadX509KeyPair(cfg.TLS.CertFile, cfg.TLS.KeyFile)
 		if err != nil {
 			return fmt.Errorf("failed to load TLS key pair: %w", err)
@@ -195,13 +203,13 @@ func run(log *logging.ZapEventLogger) error {
 		TLSConfig: tlsConfig,
 		Addr:      cfg.Web.Host,
 		Handler: handlers.RecoveryHandler()(app.FaucetHandler(log, client, db, build, &faucet.Config{
-			AllowedOrigins:         cfg.Web.AllowedOrigins,
-			BackendAddress:         cfg.Web.BackendHost,
-			TotalWithdrawalLimit:   cfg.Faucet.TotalWithdrawalLimit,
-			AddressWithdrawalLimit: cfg.Faucet.AddressWithdrawalLimit,
-			WithdrawalAmount:       cfg.Faucet.TransferAmount,
-			Account:                account,
-			ChainID:                chainID,
+			AllowedOrigins:       cfg.Web.AllowedOrigins,
+			BackendAddress:       cfg.Web.BackendHost,
+			TotalTransferLimit:   cfg.Faucet.TotalTransferLimit,
+			AddressTransferLimit: cfg.Faucet.AddressTransferLimit,
+			TransferAmount:       cfg.Faucet.TransferAmount,
+			Account:              account,
+			ChainID:              chainID,
 		})),
 		ReadTimeout:  cfg.Web.ReadTimeout,
 		WriteTimeout: cfg.Web.WriteTimeout,
@@ -213,7 +221,7 @@ func run(log *logging.ZapEventLogger) error {
 
 	go func() {
 		log.Infow("startup", "status", "api router started", "host", api.Addr)
-		switch cfg.TLS.Disable {
+		switch cfg.TLS.Disabled {
 		case true:
 			serverErrors <- api.ListenAndServe()
 		case false:

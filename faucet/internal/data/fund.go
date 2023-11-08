@@ -7,11 +7,11 @@ type FundRequest struct {
 }
 
 type AddrInfo struct {
-	Amount           uint64    `json:"amount"`
-	LatestWithdrawal time.Time `json:"latest_withdrawal"`
+	Amount         uint64    `json:"amount"`
+	LatestTransfer time.Time `json:"latest_transfer"`
 }
 
 type TotalInfo struct {
-	Amount           uint64    `json:"amount"`
-	LatestWithdrawal time.Time `json:"latest_withdrawal"`
+	Amount         uint64    `json:"amount"`
+	LatestTransfer time.Time `json:"latest_transfer"`
 }

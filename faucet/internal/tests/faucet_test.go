@@ -70,8 +70,8 @@ func Test_Faucet(t *testing.T) {
 
 	cfg := faucet.Config{
 		TotalTransferLimit:   1000,
-		AddressTransferLimit: 20,
-		TransferAmount:       11,
+		AddressTransferLimit: 50,
+		TransferAmount:       10,
 		Account:              account,
 		ChainID:              chainID,
 	}
@@ -99,7 +99,8 @@ func Test_Faucet(t *testing.T) {
 	t.Run("addrsBaseline", tests.addrsBaseline)
 	t.Run("clientAvailable", tests.clientAvailable)
 	t.Run("fundEmptyAddress", tests.emptyAddress)
-	t.Run("fundAddress201", tests.fundAddress201)
+	t.Run("fundAddress201EthAddr", tests.fundAddress201EthAddr)
+	t.Run("fundAddress201FilecoinAddr", tests.fundAddress201FilecoinAddr)
 	t.Run("fundAddressWithMoreThanAllowed", tests.fundAddressWithMoreThanAllowed)
 	t.Run("fundAddressWithMoreThanTotal", tests.fundAddressWithMoreThanTotal)
 	t.Run("liveness", tests.liveness)
@@ -153,14 +154,22 @@ func (ft *FaucetTests) emptyAddress(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func (ft *FaucetTests) fundAddress201(t *testing.T) {
+func (ft *FaucetTests) fundAddress201EthAddr(t *testing.T) {
+	ft.fundAddress(t, TestAddr1, TestAddr1)
+}
+
+func (ft *FaucetTests) fundAddress201FilecoinAddr(t *testing.T) {
+	ft.fundAddress(t, FilecoinTestAddr1, TestAddr1)
+}
+
+func (ft *FaucetTests) fundAddress(t *testing.T, fundAddr, checkAddr string) {
 	block, err := ft.client.BlockByNumber(context.Background(), nil)
 	require.NoError(t, err)
 
-	oldBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(TestAddr1), block.Number())
+	oldBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(checkAddr), block.Number())
 	require.NoError(t, err)
 
-	req := data.FundRequest{Address: FilecoinTestAddr1}
+	req := data.FundRequest{Address: fundAddr}
 
 	body, err := json.Marshal(&req)
 	if err != nil {
@@ -177,7 +186,7 @@ func (ft *FaucetTests) fundAddress201(t *testing.T) {
 	block, err = ft.client.BlockByNumber(context.Background(), nil)
 	require.NoError(t, err)
 
-	newBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(TestAddr1), block.Number())
+	newBalance, err := ft.client.BalanceAt(context.Background(), common.HexToAddress(checkAddr), block.Number())
 	require.NoError(t, err)
 
 	require.Equal(t, new(big.Int).Add(oldBalance, ft.transferAmount), newBalance)

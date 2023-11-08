@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
+
+	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
 
 	"github.com/consensus-shipyard/calibration/faucet/internal/tests"
 )

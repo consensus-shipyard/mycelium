@@ -4,7 +4,9 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	logging "github.com/ipfs/go-log/v2"
 
 	"github.com/consensus-shipyard/calibration/faucet/internal/data"
@@ -35,13 +37,20 @@ func (h *FaucetWebService) handleFunds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ethAddr, err := types.EthAddressFromFilecoinAddressString(req.Address)
-	if err != nil {
-		web.RespondError(w, http.StatusBadRequest, err)
-		return
+	var ethAddr common.Address
+	var err error
+
+	if strings.HasPrefix(req.Address, "0x") {
+		ethAddr = common.HexToAddress(req.Address)
+	} else {
+		ethAddr, err = types.EthAddressFromFilecoinAddressString(req.Address)
+		if err != nil {
+			web.RespondError(w, http.StatusBadRequest, err)
+			return
+		}
 	}
 
-	h.log.Infof("%s requests funds for {eth:%s, filecoin: %s}", r.RemoteAddr, ethAddr, req.Address)
+	h.log.Infof("%s requests funds for %s", r.RemoteAddr, ethAddr)
 
 	if err = h.faucet.FundAddress(r.Context(), ethAddr); err != nil {
 		h.log.Errorw("failed to fund address", "addr", ethAddr, "err", err)

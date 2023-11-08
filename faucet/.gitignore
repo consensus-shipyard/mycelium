@@ -3,3 +3,4 @@ _db_data/
 _cert/*.pem
 _cert/*.key
 faucet
+*.log

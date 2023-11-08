@@ -62,10 +62,10 @@ func run(log *logging.ZapEventLogger) error {
 			KeyFile  string `conf:"default:nokey.pem"`
 		}
 		Faucet struct {
-			// Amount of tokens that below is in FIL.
-			TotalTransferLimit   uint64 `conf:"default:10000"`
-			AddressTransferLimit uint64 `conf:"default:20"`
-			TransferAmount       uint64 `conf:"default:10"`
+			// Amount of tokens that below is in Eth.
+			TotalTransferLimit   uint64 `conf:"default:9000"` // 9000 Ether
+			AddressTransferLimit uint64 `conf:"default:90"`   // 90 Ether
+			TransferAmount       uint64 `conf:"default:30"`   // 30 Ether
 		}
 		Ethereum struct {
 			API            string `conf:"required"`

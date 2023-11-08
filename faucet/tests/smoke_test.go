@@ -8,30 +8,29 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/consensus-shipyard/calibration/faucet/internal/faucet"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
-)
 
-const (
-	TestAddr3 = "0xE11BA2b4D45Eaed5996Cd0823791E0C93114882d"
-	TestAddr4 = "0xd03ea8624C8C5987235048901fB614fDcA89b117"
+	"github.com/consensus-shipyard/calibration/faucet/internal/tests"
 )
 
 func Test_Smoke_Service(t *testing.T) {
 	ctx := context.Background()
 
-	transferAmount := new(big.Int).SetUint64(132)
+	// this amount must be equal to amount in faucet-test-start in the Makefile
+	transferAmount := faucet.TransferAmount(13)
 
 	client, err := ethclient.Dial("http://127.0.0.1:8545")
 	require.NoError(t, err)
 
-	oldBalance := getBalance(ctx, t, client, TestAddr3)
+	oldBalance := getBalance(ctx, t, client, tests.TestAddr3)
 
-	sendRequest(t, TestAddr3)
-	sendRequest(t, TestAddr4)
+	sendRequest(t, tests.FilecoinTestAddr3)
+	sendRequest(t, tests.FilecoinTestAddr4)
 
-	newBalance := getBalance(ctx, t, client, TestAddr3)
+	newBalance := getBalance(ctx, t, client, tests.TestAddr3)
 	require.Equal(t, new(big.Int).Add(oldBalance, transferAmount), newBalance)
 }
 
@@ -47,7 +46,7 @@ func getBalance(ctx context.Context, t *testing.T, client *ethclient.Client, acc
 
 func sendRequest(t *testing.T, to string) {
 	body := []byte(
-		fmt.Sprintf(`{"address": "%s"}`, common.HexToAddress(to)),
+		fmt.Sprintf(`{"address": "%s"}`, to),
 	)
 
 	r, err := http.NewRequest("POST", "http://localhost:8000/fund", bytes.NewBuffer(body))

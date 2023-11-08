@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ipfs/go-datastore"
 	logging "github.com/ipfs/go-log/v2"
 
@@ -115,14 +116,14 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 		return fmt.Errorf("failed to retrieve nonce: %w", err)
 	}
 
-	amount := new(big.Int).SetUint64(s.cfg.TransferAmount)
+	value := TransferAmount(s.cfg.TransferAmount)
 
 	gasLimit := uint64(21000) // in units
 
 	tx := types.NewTx(&types.LegacyTx{
 		Nonce:    nonce,
 		To:       &to,
-		Value:    amount,
+		Value:    value,
 		Gas:      gasLimit,
 		GasPrice: gasPrice,
 		Data:     nil,
@@ -144,4 +145,8 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 	s.log.Infof("faucetAddress %v funded successfully", to)
 
 	return nil
+}
+
+func TransferAmount(amount uint64) *big.Int {
+	return new(big.Int).Mul(new(big.Int).SetUint64(amount), big.NewInt(params.Ether))
 }

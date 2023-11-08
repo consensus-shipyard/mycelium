@@ -101,26 +101,36 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 	return nil
 }
 
-func (s *Service) transferETH(ctx context.Context, toAddress common.Address) error {
-	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
-	if err != nil {
-		return err
-	}
+func (s *Service) transferETH(ctx context.Context, to common.Address) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*5000*4)
+	defer cancel()
 
-	value := new(big.Int).SetUint64(s.cfg.WithdrawalAmount)
-
-	gasLimit := uint64(21000) // in units
 	gasPrice, err := s.client.SuggestGasPrice(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to retrieve gas price: %w", err)
 	}
 
-	var bytes []byte
-	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, bytes)
+	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve nonce: %w", err)
+	}
 
-	// signer := types.LatestSignerForChainID(s.cfg.ChainID)
+	amount := new(big.Int).SetUint64(s.cfg.WithdrawalAmount)
 
-	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, s.cfg.Account.PrivateKey)
+	gasLimit := uint64(21000) // in units
+
+	tx := types.NewTx(&types.LegacyTx{
+		Nonce:    nonce,
+		To:       &to,
+		Value:    amount,
+		Gas:      gasLimit,
+		GasPrice: gasPrice,
+		Data:     nil,
+	})
+
+	signer := types.LatestSignerForChainID(s.cfg.ChainID)
+
+	signedTx, err := types.SignTx(tx, signer, s.cfg.Account.PrivateKey)
 	if err != nil {
 		return fmt.Errorf("failed to sign tx: %w", err)
 	}
@@ -131,7 +141,7 @@ func (s *Service) transferETH(ctx context.Context, toAddress common.Address) err
 	}
 
 	s.log.Infof("tx sent: %s", signedTx.Hash().Hex())
-	s.log.Infof("faucetAddress %v funded successfully", toAddress)
+	s.log.Infof("faucetAddress %v funded successfully", to)
 
 	return nil
 }

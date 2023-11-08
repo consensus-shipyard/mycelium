@@ -166,10 +166,17 @@ func run(log *logging.ZapEventLogger) error {
 		return fmt.Errorf("failed to initialize account: %w", err)
 	}
 
-	chainID, err := client.NetworkID(ctx)
+	chainID, err := client.ChainID(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to initialize private key: %w", err)
 	}
+
+	networkID, err := client.NetworkID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initialize private key: %w", err)
+	}
+
+	log.Infow("startup", "ChainID", chainID, "NetworkID", networkID)
 
 	// =========================================================================
 	// Start API Service

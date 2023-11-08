@@ -44,7 +44,7 @@ const (
 	storePath = "./_store"
 
 	localEthereumNodeURL  = "http://localhost:8545"
-	ganacheDefaultChainID = 1337
+	ganacheDefaultChainID = 1
 )
 
 func newClient() (*ethclient.Client, error) {
@@ -70,7 +70,7 @@ func Test_Faucet(t *testing.T) {
 	client, err := newClient()
 	require.NoError(t, err)
 
-	chainID, err := client.NetworkID(context.Background())
+	chainID, err := client.ChainID(context.Background())
 	require.NoError(t, err)
 
 	cfg := faucet.Config{

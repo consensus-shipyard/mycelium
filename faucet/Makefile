@@ -50,7 +50,7 @@ demo-tls:
 .PHONY: node-start
 node-start:
 	docker run --name ganache-node --rm --detach --publish 8545:8545 trufflesuite/ganache:latest \
- 		--accounts 10 --wallet.deterministic
+ 		--accounts 10 --wallet.deterministic --chain.chainId 1
 
 .PHONY: node-stop
 node-stop:

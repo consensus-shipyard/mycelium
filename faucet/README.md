@@ -2,6 +2,28 @@
 
 ## How to Run
 
+- Install Golang
+- 
+- Build the service:
+```azure
+cd faucet
+make build
+```
+
+- Run the service:
+```azure
+./faucet --web-host "127.0.0.1:80" --web-allowed-origins "http://service.name" --web-backend-host "http://service.name/fund" \
+    --ethereum-private-key "key" --ethereum-url "url"
+```
+
+## Health API
+
+- To check service readiness: `GET /readiness`
+- To check service liveness: `GET /liveness`
+
+
+## Configuration
+
 ### Private Key
  - The private key can be provided directly via CLI or stored in a file. 
  - The private key must not contain "0x"
@@ -9,26 +31,30 @@
 
 ### Enabled TLS
 ```azure
-go run ./cmd/main.go --tls-enabled --web-allowed-origins "https://frontend" --web-backend-host "https://faucet/fund" \
+./faucet --tls-enabled --web-allowed-origins "https://frontend" --web-backend-host "https://faucet/fund" \
     --tls-cert-file "path_to_cert.pem" --tls-key-file "path_to_key.pem" \
     --ethereum-private-key "key" --ethereum-url "url"
 ```
 ### Disabled TLS
 
 ```azure
-go run ./cmd/main.go --web-allowed-origins "http://frontend" --web-backend-host "https://faucet/fund" \
+./faucet --web-allowed-origins "http://frontend" --web-backend-host "https://faucet/fund" \
     --ethereum-private-key "key" --ethereum-url "url"
 ```
 
 ## Development
-To run the service even in the development mode, you must provide an X509 certificate.
+
+### TLS
+To run the service even in the development mode with TLS, you must provide an X509 certificate.
 
 The easiest way to do that is to use [mkcert](https://github.com/FiloSottile/mkcert)
 tool and `make cert` command.
 
 Run `make all` to ensure that tests pass and `make demo` to run a demo accessible on localhost.
 
-## Ganache Test Accounts
+### Ganache Test Accounts
+
+Ganache node is deployed locally by `make node-start`.
 
 These accounts and keys are used for local demos and testing.
 

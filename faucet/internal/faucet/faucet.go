@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ipfs/go-datastore"
@@ -106,11 +107,6 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*5000*4)
 	defer cancel()
 
-	gasPrice, err := s.client.SuggestGasPrice(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve gas price: %w", err)
-	}
-
 	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve nonce: %w", err)
@@ -119,21 +115,36 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 	value := TransferAmount(s.cfg.TransferAmount)
 
 	gasLimit := uint64(21000) // in units
+	gasTipCap, err := s.client.SuggestGasTipCap(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to suggest gas tip: %w", err)
+	}
+	gasFeeCap, err := s.client.SuggestGasPrice(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to suggest gas price: %w", err)
+	}
 
-	tx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		To:       &to,
-		Value:    value,
-		Gas:      gasLimit,
-		GasPrice: gasPrice,
-		Data:     nil,
-	})
+	rawTx := &types.DynamicFeeTx{
+		ChainID:   s.cfg.ChainID,
+		Nonce:     nonce,
+		GasFeeCap: gasFeeCap,
+		GasTipCap: gasTipCap,
+		Gas:       gasLimit,
+		To:        &to,
+		Value:     value,
+		Data:      nil,
+	}
 
+	gas, err := core.IntrinsicGas(nil, nil, false, true, true, false)
+	if err != nil {
+		return err
+	}
+	rawTx.Gas = gas
 	signer := types.LatestSignerForChainID(s.cfg.ChainID)
 
-	signedTx, err := types.SignTx(tx, signer, s.cfg.Account.PrivateKey)
+	signedTx, err := types.SignNewTx(s.cfg.Account.PrivateKey, signer, rawTx)
 	if err != nil {
-		return fmt.Errorf("failed to sign tx: %w", err)
+		return err
 	}
 
 	err = s.client.SendTransaction(ctx, signedTx)

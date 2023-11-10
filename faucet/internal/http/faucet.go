@@ -33,6 +33,7 @@ func (h *FaucetWebService) handleFunds(w http.ResponseWriter, r *http.Request) {
 	var req data.FundRequest
 
 	if err := web.Decode(r, &req); err != nil {
+		h.log.Errorw("failed to decode request", "remote", r.RemoteAddr, "error", err)
 		web.RespondError(w, http.StatusBadRequest, err)
 		return
 	}
@@ -45,6 +46,7 @@ func (h *FaucetWebService) handleFunds(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ethAddr, err = types.EthAddressFromFilecoinAddressString(req.Address)
 		if err != nil {
+			h.log.Errorw("unable to convert Filecoin address", "remote", r.RemoteAddr, "addr", ethAddr, "error", err)
 			web.RespondError(w, http.StatusBadRequest, err)
 			return
 		}
@@ -53,7 +55,7 @@ func (h *FaucetWebService) handleFunds(w http.ResponseWriter, r *http.Request) {
 	h.log.Infof("%s requests funds for %s", r.RemoteAddr, ethAddr)
 
 	if err = h.faucet.FundAddress(r.Context(), ethAddr); err != nil {
-		h.log.Errorw("failed to fund address", "addr", ethAddr, "err", err)
+		h.log.Errorw("failed to fund address", "remote", r.RemoteAddr, "addr", ethAddr, "err", err)
 		web.RespondError(w, http.StatusInternalServerError, err)
 		return
 	}

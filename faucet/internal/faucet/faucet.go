@@ -106,11 +106,6 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*5000*4)
 	defer cancel()
 
-	gasPrice, err := s.client.SuggestGasPrice(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve gas price: %w", err)
-	}
-
 	nonce, err := s.client.PendingNonceAt(ctx, s.cfg.Account.Address)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve nonce: %w", err)
@@ -118,15 +113,19 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 
 	value := TransferAmount(s.cfg.TransferAmount)
 
-	gasLimit := uint64(21000) // in units
+	gasLimit := uint64(21000)            // in units
+	gasTipCap := big.NewInt(2000000000)  // maxPriorityFeePerGas = 2 Gwei
+	gasFeeCap := big.NewInt(20000000000) // maxFeePerGas = 20 Gwei
 
-	tx := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		To:       &to,
-		Value:    value,
-		Gas:      gasLimit,
-		GasPrice: gasPrice,
-		Data:     nil,
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   s.cfg.ChainID,
+		Nonce:     nonce,
+		GasFeeCap: gasFeeCap,
+		GasTipCap: gasTipCap,
+		Gas:       gasLimit,
+		To:        &to,
+		Value:     value,
+		Data:      nil,
 	})
 
 	signer := types.LatestSignerForChainID(s.cfg.ChainID)

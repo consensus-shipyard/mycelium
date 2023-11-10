@@ -5,13 +5,13 @@
 - Install Golang
 - 
 - Build the service:
-```azure
+```bash
 cd faucet
 make build
 ```
 
 - Run the service:
-```azure
+```bash
 ./faucet --web-host "127.0.0.1:80" --web-allowed-origins "http://service.name" --web-backend-host "http://service.name/fund" \
     --ethereum-private-key "key" --ethereum-url "url"
 ```
@@ -24,20 +24,31 @@ make build
 
 ## Configuration
 
+### Logging
+
+Logging can be configured through two main environment variables: `GOLOG_LOG_LEVEL` and `GOLOG_FILE`.
+More information about how to configure logging you can find [here](https://github.com/ipfs/go-log#environment-variables).
+
+For example:
+```bash
+GOLOG_FILE="./faucet.logs" GOLOG_LOG_LEVEL="debug" ./faucet --web-host "127.0.0.1:80" --web-allowed-origins "http://service.name" --web-backend-host "http://service.name/fund" \
+--ethereum-private-key "key" --ethereum-url "url"
+```
+
 ### Private Key
  - The private key can be provided directly via CLI or stored in a file. 
  - The private key must not contain "0x"
  - The private key file must not contain new line characters.
 
 ### Enabled TLS
-```azure
+```bash
 ./faucet --tls-enabled --web-allowed-origins "https://frontend" --web-backend-host "https://faucet/fund" \
     --tls-cert-file "path_to_cert.pem" --tls-key-file "path_to_key.pem" \
     --ethereum-private-key "key" --ethereum-url "url"
 ```
 ### Disabled TLS
 
-```azure
+```bash
 ./faucet --web-allowed-origins "http://frontend" --web-backend-host "https://faucet/fund" \
     --ethereum-private-key "key" --ethereum-url "url"
 ```
@@ -45,7 +56,7 @@ make build
 ## Development
 
 ### TLS
-To run the service even in the development mode with TLS, you must provide an X509 certificate.
+To run the service in the development mode with TLS, you must provide an X509 certificate.
 
 The easiest way to do that is to use [mkcert](https://github.com/FiloSottile/mkcert)
 tool and `make cert` command.
@@ -54,11 +65,11 @@ Run `make all` to ensure that tests pass and `make demo` to run a demo accessibl
 
 ### Ganache Test Accounts
 
-Ganache node is deployed locally by `make node-start`.
+A `Ganache` node is started locally by `make node-start` and can be stopped by `make node-stop`.
 
 These accounts and keys are used for local demos and testing.
 
-```azure
+```bash
 Available Accounts
 ==================
 (0) 0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1 (1000 ETH)

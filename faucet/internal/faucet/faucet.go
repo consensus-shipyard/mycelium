@@ -135,7 +135,15 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 		Data:      nil,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to suggest gas price: %w", err)
+		s.log.Errorw(
+			"failed to estimate gas price",
+			"to", to.String(),
+			"from", s.cfg.Account.Address,
+			"GasFeeCap", gasFeeCap,
+			"gasTipCap", gasTipCap,
+			"baseFee", baseFee,
+		)
+		return fmt.Errorf("failed to estimate gas price: %w", err)
 	}
 
 	rawTx := &types.DynamicFeeTx{

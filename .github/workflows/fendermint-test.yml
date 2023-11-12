@@ -1,0 +1,51 @@
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  tests-go-stable:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: faucet
+    strategy:
+      matrix:
+        go: [ '1.20' ]
+    steps:
+      - name: Set up Golang
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: rustfmt
+
+      - name: Install cargomake
+        run: cargo install --force cargo-make
+
+      - name: Checkout Faucet
+        uses: actions/checkout@v3
+
+      - name: Checkout Fendermint
+        uses: actions/checkout@v3
+        with:
+          repository: consensus-shipyard/fendermint
+          path: fendermint
+
+      - name: Installand Run Fendermint
+        run: |
+          cd fendermint
+          make build
+          cargo make --makefile ./infra/Makefile.toml testnode
+
+      - name: Stop Fendermint
+        run: |
+          cd fendermint
+          make build
+          cargo make --makefile ./infra/Makefile.toml testnode-down    

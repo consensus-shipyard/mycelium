@@ -16,7 +16,7 @@ $(() => {
             url: FAUCET_BACKEND,
             crossDomain: true, // set as a cross domain request
             data: data,
-            timeout: 60_000,
+            timeout: 120_000,
             success: function(data, status, xhr) {
                 successAlert();
             },

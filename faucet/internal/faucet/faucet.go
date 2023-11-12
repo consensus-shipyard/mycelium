@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ipfs/go-datastore"
@@ -85,7 +85,6 @@ func (s *Service) FundAddress(ctx context.Context, targetAddr common.Address) er
 	s.log.Infof("funding %v is allowed", targetAddr)
 
 	if err = s.transferETH(ctx, targetAddr); err != nil {
-		s.log.Errorw("failed to transfer eth", "err", err)
 		return fmt.Errorf("fail to send tx: %w", err)
 	}
 
@@ -114,14 +113,37 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 
 	value := TransferAmount(s.cfg.TransferAmount)
 
-	gasLimit := uint64(21000) // in units
 	gasTipCap, err := s.client.SuggestGasTipCap(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to suggest gas tip: %w", err)
 	}
-	gasFeeCap, err := s.client.SuggestGasPrice(ctx)
+
+	// https://github.com/ethereum/go-ethereum/issues/23125
+	block, err := s.client.BlockByNumber(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("failed to suggest gas price: %w", err)
+		return fmt.Errorf("failed to get block: %w", err)
+	}
+	baseFee := block.BaseFee()
+	gasFeeCap := new(big.Int).SetUint64(1500000000)
+	gasFeeCap.Add(gasFeeCap, baseFee.Mul(baseFee, big.NewInt(2)))
+
+	gasLimit, err := s.client.EstimateGas(ctx, ethereum.CallMsg{
+		From:      s.cfg.Account.Address,
+		To:        &to,
+		GasFeeCap: gasFeeCap,
+		GasTipCap: gasTipCap,
+		Data:      nil,
+	})
+	if err != nil {
+		s.log.Errorw(
+			"failed to estimate gas price",
+			"to", to.String(),
+			"from", s.cfg.Account.Address,
+			"GasFeeCap", gasFeeCap,
+			"gasTipCap", gasTipCap,
+			"baseFee", baseFee,
+		)
+		return fmt.Errorf("failed to estimate gas price: %w", err)
 	}
 
 	rawTx := &types.DynamicFeeTx{
@@ -135,11 +157,6 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 		Data:      nil,
 	}
 
-	gas, err := core.IntrinsicGas(nil, nil, false, true, true, false)
-	if err != nil {
-		return err
-	}
-	rawTx.Gas = gas
 	signer := types.LatestSignerForChainID(s.cfg.ChainID)
 
 	signedTx, err := types.SignNewTx(s.cfg.Account.PrivateKey, signer, rawTx)
@@ -149,6 +166,13 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 
 	err = s.client.SendTransaction(ctx, signedTx)
 	if err != nil {
+		s.log.Errorw(
+			"failed to send tx", "hash", signedTx.Hash(),
+			"GasFeeCap", gasFeeCap,
+			"gas", gasLimit,
+			"gasTipCap", gasTipCap,
+			"baseFee", baseFee,
+		)
 		return fmt.Errorf("failed to send tx: %w", err)
 	}
 

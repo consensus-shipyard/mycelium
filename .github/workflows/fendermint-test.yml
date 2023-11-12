@@ -5,12 +5,8 @@ on:
   pull_request:
     branches: [main]
 jobs:
-  tests-go-stable:
+  fendermint-test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: faucet
     strategy:
       matrix:
         go: [ '1.20' ]

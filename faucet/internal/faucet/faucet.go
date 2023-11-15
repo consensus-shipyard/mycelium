@@ -170,8 +170,8 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 	if err != nil {
 		s.log.Errorw(
 			"failed to send tx", "hash", signedTx.Hash(),
-			"GasFeeCap", gasFeeCap,
-			"gas", gasLimit,
+			"gasFeeCap", gasFeeCap,
+			"gasLimit", gasLimit,
 			"gasTipCap", gasTipCap,
 			"baseFee", baseFee,
 		)
@@ -179,7 +179,7 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 	}
 
 	s.log.Infof("tx sent: %s", signedTx.Hash().Hex())
-	s.log.Infof("faucetAddress %v funded successfully", to)
+	s.log.Infof("address %v funded successfully", to)
 
 	return nil
 }

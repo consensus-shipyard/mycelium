@@ -146,6 +146,8 @@ func (s *Service) transferETH(ctx context.Context, to common.Address) error {
 		return fmt.Errorf("failed to estimate gas price: %w", err)
 	}
 
+	gasLimit += gasLimit / 5
+
 	rawTx := &types.DynamicFeeTx{
 		ChainID:   s.cfg.ChainID,
 		Nonce:     nonce,

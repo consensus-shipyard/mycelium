@@ -51,8 +51,7 @@ func main() {
 	}
 	fmt.Println("Nonce: ", nonce)
 
-	value := big.NewInt(1)    // in wei (1 eth)
-	gasLimit := uint64(21000) // in units
+	value := big.NewInt(1) // in wei (1 eth)
 
 	to := common.HexToAddress("0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0")
 
@@ -75,7 +74,7 @@ func main() {
 	gasFeeCap := new(big.Int).SetUint64(1500000000)
 	gasFeeCap.Add(gasFeeCap, baseFee.Mul(baseFee, big.NewInt(2)))
 
-	gasLimit, err = client.EstimateGas(ctx, ethereum.CallMsg{
+	gasLimit, err := client.EstimateGas(ctx, ethereum.CallMsg{
 		From:      from,
 		To:        &to,
 		GasFeeCap: gasFeeCap,
@@ -86,7 +85,8 @@ func main() {
 	if err != nil {
 		log.Fatal("EstimateGas: ", err)
 	}
-	gasLimit += gasLimit / 4
+
+	gasLimit += gasLimit / 5
 
 	rawTx := &types.DynamicFeeTx{
 		ChainID:   chainID,

@@ -34,7 +34,7 @@ $(() => {
 
 function successAlert() {
     $('#result-msg').html(`<div class="alert alert-success" role="alert">
-  Congratulations! Your Calibration funds are on their way! 👾
+  Congratulations! Your Mycelium Calibration funds are on their way! 👾
   </div>`);
 }
 

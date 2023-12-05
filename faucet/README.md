@@ -1,4 +1,4 @@
-# Calibration Faucet
+# Mycelium Calibration Faucet
 
 ## How to Run
 
